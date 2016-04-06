@@ -101,6 +101,7 @@ opt_M="-M $mail_address"
 
 # default: sent mail when jobs is aborted
 opt_m="-m a"
+opt_l="-l h_rt=1:00:00"
 
 jobname=""
 while getopts "N:q:o:e:j:M:m:p:l:h:H:" opt; do
