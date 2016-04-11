@@ -27,18 +27,31 @@ sub readbarcodes {
   my ($file)=@_;
   my $bc={};
   my $libs={};
-
+  my $lengths={};
+  my ($lib, $code);
   open(FILE, "$file") or die "Barcode '$file': $!";
   while(<FILE>) {
     s/[\n\r]*$//g;
     s/#.*//;
     next LINE unless $_;
-    my ($lib, $code)=split(' ');            # e.g. 'G7 \t CCAACAAT'
+    ($lib, $code)=split(' ');            # e.g. 'G7 \t CCAACAAT'
     die "Library '$lib' not unique" if $libs->{$lib}++;
     die "Barcode '$code' not unique" if $bc->{$code};
+    $lengths->{length($code)}++;        # should be all same length
     $bc->{$code}=$lib;
   }
   close(FILE);
+  my (@lengths)=keys %$lengths;
+  if ( int(@lengths)  > 1 ) {
+    die "lengths of the barcodes not all the same, found:" . 
+        join(',', @lengths) . "\n";
+  }
+  ## also add the mononucleotides under their own sequence as name
+  for my $nuc (qw(A C G T N)) {
+    die "adding of mononucs untested";
+    $code=$nuc x $lengths[0];
+    $bc->{$code}=$code;
+  }
   $bc;
 }                                       # readbarcodes
 
@@ -57,6 +70,7 @@ sub open_infile {
 sub open_outfiles { 
   my(@libs)=@_;
   my $fhs={};
+  my $names={};
 
   for my $lib (@libs) { 
     my $name=sprintf("%s.fastq.gz", $lib);
@@ -65,14 +79,17 @@ sub open_outfiles {
     my $fh = FileHandle->new("| gzip > $name") or die "library $lib, file $name: $!";
     warn "Creating/overwriting file $name ...\n";
     $fhs->{$lib}=$fh;
+    $names->{$lib}=$name;
   }
-  $fhs;
-}
+  ($fhs, $names);
+}                                       # open_outfiles
 
 sub close_outfiles {
-  my($fhs)=@_;
+  my($fhs, $names)=@_;
+  
   for my $lib (keys %$fhs) {
-    $fhs->{$lib}->close() or die "could not close demultiplexed file for library $lib; investigate";
+    my $name=$names->{$lib};
+    $fhs->{$lib}->close() or die "could not close demultiplexed file $name for library $lib; investigate";
   }
 }
 
@@ -86,8 +103,8 @@ sub ambiguous {
 
 my $codes = readbarcodes($opt_b);       # eg. $code->{'AGCGTT') => 'M3'
 my @files=(values %$codes, 'AMBIGUOUS', 'UNKNOWN');
-my $filehandles=open_outfiles(@files);      # opens M3.fastq.gz, ambiguous.fastq.gz etc.
-
+my ($filehandles, $filenames)=open_outfiles(@files);
+my $filecounts={};
 my $nexact=0;
 my $nrescued=0;                         # having at most $mismatch mismatches
 my $nunknown=0;
@@ -137,8 +154,14 @@ while(1) {
     die "should not reach this point";
   }                                     # CASE
   $filehandles->{$lib}->print($record);
+  $filecounts->{$lib}++;
 }                                       # RECORD
 close_outfiles($filehandles);
+
+for my $lib (keys %$filecounts) {
+  die "closing of empty files untested";
+  unlink $filenames->{$lib} unless $filecounts->{$lib};
+}
 
 sub commafy {
   # insert comma's to separate powers of 1000
