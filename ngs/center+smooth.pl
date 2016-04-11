@@ -42,10 +42,10 @@ Usage: center+smooth.pl --type [paired|single] [ --shift NUMBER ] [ --smooth NUM
   Be aware of the way the mapping was done. If e.g. the first 15 bp from
   the reads were discarded to improve the mapping, the shifting should not
   be by 73 bp, but by 73-15 = 58 bp (this point is of course moot for
-  paired-end data, where the shift is inferred from the template length).
+  paired-end data, where the shift is best inferred from the template length).
   Similarly, if we would be interested in nucleosome boundaries
   (separately for the left and right side), one should in this case shift
-  by -15, to pretend that the trimmed reads did actually begin at the
+  by -15, to pretend that the trimmed reads _did_ actually begin at the
   boundary.
 
   This caution also applies to the --min and --max length: the defaults
@@ -211,7 +211,6 @@ LINE:
           $too_long++;
           next LINE;
         }
-##        $s=int($tlen/2 +0.5);     # old
         $s=int( ($tlen-1)/2);     # exact for uneven seqs
         $s = $s + (unpack("%B*",$seq)%2) unless ($tlen % 2); # quasi-randomly  add 1
         # (the unpack expression is quasi-uniform hash based on sequence content)
@@ -219,10 +218,10 @@ LINE:
       }
 
       if ($reverse_strand) { 
-        die "This is not yet properly implemented (overlooking indels" if $single;
+        die "Not yet properly implemented (overlooking indels)" if $single;
         $pos = $pos + ($readlen -1) - $s - $halfsmooth;
       } else {
-        $pos =     $pos             + $s - $halfsmooth;
+        $pos = $pos                 + $s - $halfsmooth;
       }
       my $end=$pos + $smooth -1;
       
